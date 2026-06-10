@@ -223,12 +223,12 @@ if "predicted_prob" in st.session_state:
 
     with st.spinner("Preparing SHAP explainer..."):
         explainer = get_shap_explainer(
-            model=model,
-            background_data=X_train_final,
-            feature_order=feature_order,
-            background_n=80,
-            random_state=2026
-        )
+    _model=model,
+    _background_data=X_train_final,
+    feature_order=feature_order,
+    background_n=80,
+    random_state=2026
+)
 
     tab1, tab2 = st.tabs(["Patient waterfall plot", "Global beeswarm plot"])
 

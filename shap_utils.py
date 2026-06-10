@@ -1,5 +1,6 @@
 # ============================================================
 # SHAP Utilities
+# 修正版：避免 Streamlit cache_resource 对 model / DataFrame hash 报错
 # ============================================================
 
 import numpy as np
@@ -14,7 +15,10 @@ def make_predict_function(model, feature_order):
         if isinstance(X_input, pd.DataFrame):
             X_df = X_input.copy()
         else:
-            X_df = pd.DataFrame(X_input, columns=feature_order)
+            X_df = pd.DataFrame(
+                X_input,
+                columns=feature_order
+            )
 
         X_df = X_df[feature_order]
 
@@ -23,9 +27,21 @@ def make_predict_function(model, feature_order):
     return predict_poor_prep_probability
 
 
-@st.cache_resource
-def get_shap_explainer(model, background_data, feature_order, background_n=80, random_state=2026):
-    background_data = background_data[feature_order].copy()
+# ============================================================
+# 关键修正：
+# _model 和 _background_data 前面加下划线
+# Streamlit 会忽略以下划线开头的参数，不再尝试 hash 它们
+# ============================================================
+
+@st.cache_resource(show_spinner=False)
+def get_shap_explainer(
+    _model,
+    _background_data,
+    feature_order,
+    background_n=80,
+    random_state=2026
+):
+    background_data = _background_data[feature_order].copy()
 
     if len(background_data) > background_n:
         background_data = shap.sample(
@@ -34,10 +50,12 @@ def get_shap_explainer(model, background_data, feature_order, background_n=80, r
             random_state=random_state
         )
 
-    masker = shap.maskers.Independent(background_data)
+    masker = shap.maskers.Independent(
+        background_data
+    )
 
     explainer = shap.Explainer(
-        make_predict_function(model, feature_order),
+        make_predict_function(_model, feature_order),
         masker,
         algorithm="permutation",
         seed=random_state
@@ -55,9 +73,8 @@ def get_display_names(feature_order, feature_name_map):
 
 def build_display_data(X_model_df, X_raw_df, feature_order):
     """
-    SHAP values are computed on model-scaled input.
-    Display data are kept mostly as model input values.
-    This avoids feature misalignment while still using readable feature names.
+    SHAP values 使用模型输入计算。
+    为了避免错位，这里展示值仍使用模型输入矩阵。
     """
     return X_model_df[feature_order].values
 
@@ -78,12 +95,19 @@ def compute_patient_shap(
         max_evals=max_evals
     )
 
-    feature_display_names = get_display_names(feature_order, feature_name_map)
+    feature_display_names = get_display_names(
+        feature_order,
+        feature_name_map
+    )
 
     patient_shap_values = shap.Explanation(
         values=shap_values_raw.values,
         base_values=shap_values_raw.base_values,
-        data=build_display_data(patient_model_df, patient_raw_df, feature_order),
+        data=build_display_data(
+            patient_model_df,
+            patient_raw_df,
+            feature_order
+        ),
         feature_names=feature_display_names
     )
 
@@ -116,7 +140,10 @@ def compute_global_shap(
         max_evals=max_evals
     )
 
-    feature_display_names = get_display_names(feature_order, feature_name_map)
+    feature_display_names = get_display_names(
+        feature_order,
+        feature_name_map
+    )
 
     global_shap_values = shap.Explanation(
         values=shap_values_raw.values,
@@ -128,7 +155,11 @@ def compute_global_shap(
     return global_shap_values
 
 
-def plot_patient_waterfall(patient_shap_values, predicted_prob, max_display=15):
+def plot_patient_waterfall(
+    patient_shap_values,
+    predicted_prob,
+    max_display=15
+):
     plt.figure(figsize=(11, 7))
 
     shap.plots.waterfall(
@@ -151,7 +182,10 @@ def plot_patient_waterfall(patient_shap_values, predicted_prob, max_display=15):
     return fig
 
 
-def plot_global_beeswarm(global_shap_values, max_display=20):
+def plot_global_beeswarm(
+    global_shap_values,
+    max_display=20
+):
     plt.figure(figsize=(11, 8))
 
     shap.plots.beeswarm(
